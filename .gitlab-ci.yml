@@ -1,0 +1,83 @@
+# 默认选项，所有任务在没有覆盖此处选项的时候使用这里的默认值
+default:
+  # 默认的镜像
+  image: swr.cn-east-3.myhuaweicloud.com/zixel/golang:1.18.1-alpine3.15
+
+# alpine 是Docker维护的一个小巧的linux镜像，相对于Debian和其他发布镜像，它在提供给基础功能的同时，尺寸比其他镜像小了近一半。原始镜像更是只有5M左右。
+
+# alpine 使用apk作为包管理工具，添加包只需要apk add [包名] 即可
+
+# 阶段设置，这里的各个阶段会在GitLab 侧边栏的 CI/CD 中显示出来。这里定义了四个阶段
+stages:
+  # 测试
+  - test
+  # 构建
+  - build
+  # 部署阶段，使用kubectl命令行操作k8s
+  - deploy
+
+test-job:
+  image: swr.cn-east-3.myhuaweicloud.com/zixel/fe-base:1.0.0
+  stage: test
+  tags:
+    - linux
+    - npm16
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - npm ci --cache /root/.npm --prefer-offline
+    - npm run build:dev
+
+build-job:
+  image: swr.cn-east-3.myhuaweicloud.com/zixel/docker:20.10.14-alpine3.15
+  stage: build
+  tags:
+    - docker
+  only:
+    - dev
+    - main
+  script:
+    - echo "Make docker image and push to $DockerRegistry"
+    - echo "Current directory is $(pwd)"
+    # 查看当前文件
+    - ls -l --color
+    # 登录华为镜像仓库
+    - /root/registry-login.sh
+    # 进入镜像打包的目录
+    # 创建Dockerfile
+    - |
+      tee Dockerfile << EOF
+      FROM swr.cn-east-3.myhuaweicloud.com/zixel/fe-base:1.0.0
+      WORKDIR /
+      COPY . /tool
+      WORKDIR tool
+      RUN npm install && npm run build:${CI_COMMIT_REF_NAME}
+      ENTRYPOINT node .output/server/index.mjs 
+      EOF
+    # 检查 Dockerfile
+    - cat Dockerfile
+    # 开始构建镜像，镜像名一定要是小写，否则会报错
+    - ls -l --color
+    - docker build -t swr.cn-east-3.myhuaweicloud.com/zixel/fe-tool:$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA .
+    # 推送镜像
+    - docker push swr.cn-east-3.myhuaweicloud.com/zixel/fe-tool:$CI_COMMIT_BRANCH-$CI_COMMIT_SHORT_SHA
+
+deploy-job:
+  image:
+    name: swr.cn-east-3.myhuaweicloud.com/zixel/bitnami/kubectl:1.23-debian-10
+  stage: deploy
+  tags:
+    - golang
+  only:
+    - dev
+
+  script:
+    - echo "Deploy service on k8s"
+    - pwd
+    - ls -a /.kube
+    - ls -a /root/.kube
+    - chmod a+x ./scripts/deploy.sh
+    - ./scripts/deploy.sh
+    # - kubectl config get-contexts
+    # - kubectl config use-context xufeng/license-management-service:golang-agent
+    - kubectl get pods --all-namespaces

@@ -1,0 +1,30 @@
+@use '@zixel/zaf-theme/index.css';
+
+:root {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei',
+    '微软雅黑', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+
+  /* css */
+  --main-dark: #303133;
+  --dark-gray: #606266;
+  --light-gray: #999a9c;
+  --main-blue: #6b70ec;
+  --link-visit: #5b5fcc;
+  --link-hover: #7377ff;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
